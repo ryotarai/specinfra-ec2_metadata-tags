@@ -9,9 +9,7 @@ module Specinfra
       end
 
       def get
-        region = @host_inventory['ec2']['placement']['availability-zone'].gsub(/[a-z]$/, '')
-        ec2 = Aws::EC2::Client.new(:region => region)
-        page = ec2.describe_tags(
+        page = client.describe_tags(
           :filters => [{
             :name   => 'resource-id',
             :values => [ @host_inventory['ec2']['instance-id'] ],
@@ -24,6 +22,21 @@ module Specinfra
           end
         end
         tags
+      end
+
+      private
+      def region
+        @host_inventory['ec2']['placement']['availability-zone'].gsub(/[a-z]$/, '')
+      end
+
+      def client
+        return @client if @client
+
+        retry_limit = ENV.fetch('SPECINFRA_EC2_RETRY_LIMIT', 3).to_i
+        @client = Aws::EC2::Client.new(
+          :region => region,
+          :retry_limit => retry_limit,
+        )
       end
     end
   end
