@@ -9,6 +9,19 @@ module Specinfra
       end
 
       def get
+        begin
+          get_by_describe_tags
+        rescue Aws::EC2::Errors::RequestLimitExceeded
+          get_by_describe_instances
+        end
+      end
+
+      private
+      def region
+        @host_inventory['ec2']['placement']['availability-zone'].gsub(/[a-z]$/, '')
+      end
+
+      def get_by_describe_tags
         page = client.describe_tags(
           :filters => [{
             :name   => 'resource-id',
@@ -24,9 +37,16 @@ module Specinfra
         tags
       end
 
-      private
-      def region
-        @host_inventory['ec2']['placement']['availability-zone'].gsub(/[a-z]$/, '')
+      def get_by_describe_instances
+        resp = client.describe_instances(
+          :instance_ids => [@host_inventory['ec2']['instance-id']],
+        )
+        tags = {}
+        instance = resp.reservations.first.instances.first
+        instance.tags.each do |t|
+          tags[t.key] = t.value
+        end
+        tags
       end
 
       def client
